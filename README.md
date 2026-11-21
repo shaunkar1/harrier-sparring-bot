@@ -109,3 +109,26 @@ The assistant did **not** make any changes to your `proj1` repository and did no
 ## Caveats
 
 This is an original baseline sparring adversary, not a claim to be the strongest tournament bot. Its 5m ground navigation intentionally does not plan rooftop jet ascents, so roof campers can exploit it. It plans with visible/projectile observations, not omniscient enemy positions. Its `safeSpot` and firing logic are heuristic. These limitations are useful to expose *one* class of bias, but run alongside other opponent strategies too.
+
+
+## Leader sparring profile (AT/Mustikas-inspired adversary)
+
+Set `SPAR_PROFILE=leader` or run `./run-leader.sh` after `go build -o harrier .`.
+
+This **separate, hypothetical adversarial policy** implements reported leader traits: approximately one full idle scan every 1.8 seconds, early NPC/crate/cube farming, preferred laser + lightning weapon combination (drops gun rather than carrying mortar), opportunistic attacks against weaker mechs, aggressive pursuit into lightning range, and close-range energy preservation. The movement and targeting logic is independent of `shaunkar1/proj1`.
+
+Reproduce local verification with the organizer's kit at `$KIT_DIR`:
+
+```sh
+go test ./...
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o harrier .
+SPAR_PROFILE=leader python3 "$KIT_DIR/check/check.py" -- ./harrier
+```
+
+In Claude's FFA simulator, after setting `SPAR_MAP_DIR` to its locally available arena directory:
+
+```sh
+SPAR_PROFILE=leader go run ./cmd/sim -mode ffa -n 48 -j 2 -hello "$KIT_DIR/check/stream.jsonl.gz" -cand "paw,paw,paw,paw,paw,paw,paw,paw,paw,paw,paw,paw,paw,paw,paw,ext:$SPAR_DIR/harrier"
+```
+
+You can also include `ext:$SPAR_DIR/run-leader.sh` together with the original Harrier/Stalker/Artillery runners in a mixed field. The baseline `leader` code passed 300/300 recorded protocol observations with no timeout locally, but **no match-placement or ≥5-cubes-at-60s claim is yet validated**. Compare all candidate styles over matched seeds before drawing conclusions.
