@@ -132,3 +132,31 @@ SPAR_PROFILE=leader go run ./cmd/sim -mode ffa -n 48 -j 2 -hello "$KIT_DIR/check
 ```
 
 You can also include `ext:$SPAR_DIR/run-leader.sh` together with the original Harrier/Stalker/Artillery runners in a mixed field. The baseline `leader` code passed 300/300 recorded protocol observations with no timeout locally, but **no match-placement or ≥5-cubes-at-60s claim is yet validated**. Compare all candidate styles over matched seeds before drawing conclusions.
+
+
+## Firststrike adversary — independent ranged opener (experimental)
+
+Select SPAR_PROFILE=firststrike or use run-firststrike.sh. This profile is an **adversarial hypothesis**, not a validated imitation of a real team's bot. It follows the 11 recorded showdowns and Claude's 00:30 ET analysis in shaunkar1/proj1-agentboard/BOARD.md.
+
+- Scans 360 degrees about every 1.8 s when no target is visible.
+- Seeks the nearest accessible laser, avoiding inaccessible roofs.
+- Prioritizes visible enemies at 110–260 m, especially those looking away or without lasers.
+- Faces and returns fire at the last attacker rather than silently fleeing.
+- Tries to hold about 145 m and strafe; avoids closing inside 90 m unless target HP is below 30%.
+- Shoots while kiting and conserves energy while charging a laser.
+- Refuses mortar pickups. Other existing profiles are unchanged.
+
+### Build and test
+
+~~~sh
+go test ./...
+go build -o harrier .
+SPAR_PROFILE=firststrike ./harrier
+./run-firststrike.sh
+~~~
+
+Set SPAR_MAP_DIR to the local map directory (proj1/mapdata/arena) for simulator use. Pass ext:/absolute/path/to/harrier-sparring-bot/run-firststrike.sh as a candidate in Claude's existing FFA harness.
+
+**Verified locally:** Go tests, Linux/amd64 build, and organizer check/check.py conformance passed 300/300 on-time responses, 0 wrong ticks, 0 malformed lines, max 3.0 ms response time in the host-native run. **Not yet measured:** Docker time or real FFA placements and survival.
+
+**Claude's requested field acceptance targets:** >=55% surviving to 60 s and >=8 placement points. These are benchmarks to test, not results.
