@@ -1,0 +1,4 @@
+/harrier
+*.test
+*.out
+.DS_Store
