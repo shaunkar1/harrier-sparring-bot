@@ -77,6 +77,60 @@ func (p *Pilot) firstStrikeEnemy(o *Obs) (*Actor, float64) {
 	return best, danger
 }
 
+// firstStrikeCover ranks reachable nearby positions by whether they break
+// muzzle LOS from observed opponents. It is intentionally conservative:
+// a cover position buys enough time for the game's five-second regen delay.
+func (p *Pilot) firstStrikeCover(o *Obs) V2 {
+	me := &o.Self
+	pos := xy(me.Pos)
+	if p.w == nil {
+		return p.safeSpot(o)
+	}
+	// Refresh often as enemies move, but don't oscillate goals every tick.
+	if o.T < p.safeUntil && p.zoneDistance(o.Zone, p.safe) < -8 {
+		return p.safe
+	}
+	best := pos
+	bestScore := -1e15
+	for i := 0; i < 49; i++ {
+		q := pos
+		if i > 0 {
+			j := i - 1
+			radius := 14.0 + float64(j/12)*15.0
+			ang := (float64(j%12)/12)*2*math.Pi + float64(p.h.Slot)*0.13
+			q = pos.Add(V2{math.Cos(ang), math.Sin(ang)}.Mul(radius))
+		}
+		if !p.w.walk(q[0], q[1]) || p.zoneDistance(o.Zone, q) > -8 {
+			continue
+		}
+		travel := q.Sub(pos).Len()
+		score := -travel * 1.0
+		if p.w.nav != nil && !p.w.nav.direct(pos, q) {
+			score -= 55 // circuitous route may cost the whole regen window
+		}
+		for _, foe := range o.Mechs {
+			if foe.Kind != "mech" {
+				continue
+			}
+			d := q.Sub(xy(foe.Pos)).Len()
+			if d < 52 {
+				score -= 7 * (52 - d)
+			}
+			threat := p.threatValue(o, foe)
+			if p.exposedFrom(me, q, foe) {
+				score -= 300 * math.Max(0.35, threat)
+			} else {
+				score += 105 * math.Max(0.35, threat)
+			}
+		}
+		if score > bestScore {
+			bestScore, best = score, q
+		}
+	}
+	p.safe, p.safeUntil = best, o.T+1.2
+	return best
+}
+
 func (p *Pilot) firstStrikeAct(o *Obs) Action {
 	me := &o.Self
 	p.remember(o)
@@ -90,11 +144,32 @@ func (p *Pilot) firstStrikeAct(o *Obs) Action {
 	}
 	pos := xy(me.Pos)
 	hp := me.HP / math.Max(1, me.MaxHP)
+	// Hysteresis: once badly wounded, stop dealing damage until mostly healed.
+	// Regen starts 5 s after the last damage dealt OR taken, at 45 HP/s.
+	// We enter slightly before the 35% critical threshold to leave one-tick
+	// margin against the next projectile; 82% exit prevents oscillation.
+	if hp <= 0.38 {
+		p.firstStrikeHealing = true
+	}
+	if p.firstStrikeHealing && hp >= 0.82 && o.T-p.lastDamage >= 5 && o.T-p.lastDealt >= 5 {
+		p.firstStrikeHealing = false
+	}
 	mode, goal := "roam", p.getRoam(o)
 	lootKind := ""
 	lootGoal := V2{}
 	urgent := p.zoneUrgency(o)
-	if urgent {
+	if p.firstStrikeHealing {
+		// Zone movement takes priority over holding cover: no HP regen outside.
+		if urgent {
+			mode, goal = "zone", p.nearZoneGoal(o)
+		} else {
+			goal = p.firstStrikeCover(o)
+			mode = "retreat"
+			if goal.Sub(pos).Len() < 5 {
+				mode = "heal"
+			}
+		}
+	} else if urgent {
 		mode, goal = "zone", p.nearZoneGoal(o)
 	} else if target != nil && target.HP/math.Max(1, target.MaxHP) >= 0.30 && pos.Sub(xy(target.Pos)).Len() < 90 {
 		mode = "retreat"
@@ -147,6 +222,22 @@ func (p *Pilot) firstStrikeAct(o *Obs) Action {
 		}
 	}
 	a.Move, a.Boost, a.Jump = p.move(o, goal, mode, target, danger)
+	if p.firstStrikeHealing {
+		// Moving is fine while healing, but unnecessary movement can leave cover.
+		if mode == "heal" {
+			a.Move, a.Boost, a.Jump = V2{}, false, false
+		}
+		// A healing mech must not trigger gun/laser/lightning or farm resources:
+		// dealing ANY damage resets the 5-second regeneration countdown.
+		// It may still drop a weapon if a pickup action was already chosen.
+		a.Reload = false
+		if target != nil {
+			a.Aim = p.aimAngles(me, targetPoint(*target))
+		} else if rec := p.memory[p.lastThreat]; rec != nil {
+			a.Aim = p.aimAngles(me, targetPoint(rec.actor))
+		}
+		return a
+	}
 	if l, _ := p.weapon(me, "laser"); l != nil && l.Charge > 0 && !urgent {
 		a.Boost = false
 	}
