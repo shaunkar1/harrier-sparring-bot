@@ -19,6 +19,7 @@ type Pilot struct {
 	lastDamage   float64
 	lastDealt    float64
 	retreatUntil float64
+	firstStrikeHealing bool
 	targetID     int
 	roam         V2
 	roamUntil    float64
