@@ -42,3 +42,38 @@ func TestFirstStrikeNoBlindRushInside90(t *testing.T) {
   a:=p.firstStrikeAct(o)
   if a.Move[0]>0.9&&math.Abs(a.Move[1])<0.1{t.Fatalf("closing straight into healthy enemy: %v",a.Move)}
 }
+
+
+ // Regen is impossible if the bot keeps dealing damage. A low-health escape
+ // must persist even if the target disappears.
+ func TestFirstStrikeRegenRetreatHysteresis(t *testing.T) {
+	p := firstTestPilot()
+	o := firstTestObs(10)
+	o.Self.HP = 490 // 35% HP
+	o.Mechs = []Actor{{ID: 2, Kind: "mech", Pos: V3{150, 0, 0}, HP: 1400, MaxHP: 1400, Aim: V2{math.Pi, 0}}}
+	a := p.firstStrikeAct(o)
+	if !p.firstStrikeHealing { t.Fatal("low HP did not enter regen retreat") }
+	if a.Fire != ([2]bool{}) { t.Fatalf("fired while entering regen: %v", a.Fire) }
+
+	o = firstTestObs(16)
+	o.Self.HP = 900 // 64%, damage had stopped long ago
+	a = p.firstStrikeAct(o)
+	if !p.firstStrikeHealing { t.Fatal("exited heal state before recovering above 82%") }
+	if a.Fire != ([2]bool{}) { t.Fatalf("fired while healing: %v", a.Fire) }
+
+	o = firstTestObs(32)
+	o.Self.HP = 1150 // >82%
+	_ = p.firstStrikeAct(o)
+	if p.firstStrikeHealing { t.Fatal("failed to resume normal tactics after recovery") }
+ }
+
+ func TestFirstStrikeHealingOverridesLaserTarget(t *testing.T) {
+	p := firstTestPilot()
+	o := firstTestObs(10)
+	o.Self.HP = 420
+	o.Self.Weapons[1] = &WState{Kind: "laser", Stats: Stats{"range": 280, "charge": 0.75}, Cooldown: 0}
+	o.Mechs = []Actor{{ID: 2, Kind: "mech", Pos: V3{110, 0, 0}, HP: 100, MaxHP: 1400, Aim: V2{math.Pi, 0}}}
+	a := p.firstStrikeAct(o)
+	if !p.firstStrikeHealing { t.Fatal("should heal, even with easy kill opportunity") }
+	if a.Fire != ([2]bool{}) { t.Fatalf("heal policy must suppress attacks: %v", a.Fire) }
+ }
