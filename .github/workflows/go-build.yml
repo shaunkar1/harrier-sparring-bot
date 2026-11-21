@@ -1,0 +1,16 @@
+name: Go build and tests
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Run Go unit tests
+        run: go test ./...
+      - name: Build 64-bit Linux binary
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o harrier .
