@@ -40,7 +40,7 @@ func newPilot(h Hello) *Pilot {
 		mapDir = override // local simulators may record /arena as the map location
 	}
 	p := &Pilot{h: h, w: loadWorld(mapDir), rng: rand.New(rand.NewSource(h.Seed + int64(h.Slot*2971))), style: os.Getenv("SPAR_PROFILE"), memory: make(map[int]*remembered), targetID: -1, lastThreat: -1}
-	if p.style != "artillery" && p.style != "stalker" && p.style != "harrier" && p.style != "leader" {
+	if p.style != "artillery" && p.style != "stalker" && p.style != "harrier" && p.style != "leader" && p.style != "firststrike" {
 		p.style = "harrier"
 	}
 	return p
@@ -501,7 +501,8 @@ func (p *Pilot) move(o *Obs, goal V2, mode string, target *Actor, danger float64
 			if p.style == "artillery" {
 				pref = 150
 			}
-			if (p.has(me, "lightning") && me.Energy > 20) && p.style != "artillery" {
+			if p.style == "firststrike" { pref = 145 }
+			if (p.has(me, "lightning") && me.Energy > 20) && p.style != "artillery" && p.style != "firststrike" {
 				pref = 34
 			}
 			score -= math.Abs(d-pref) * 0.55
