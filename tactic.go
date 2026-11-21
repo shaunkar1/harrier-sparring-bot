@@ -40,7 +40,7 @@ func newPilot(h Hello) *Pilot {
 		mapDir = override // local simulators may record /arena as the map location
 	}
 	p := &Pilot{h: h, w: loadWorld(mapDir), rng: rand.New(rand.NewSource(h.Seed + int64(h.Slot*2971))), style: os.Getenv("SPAR_PROFILE"), memory: make(map[int]*remembered), targetID: -1, lastThreat: -1}
-	if p.style != "artillery" && p.style != "stalker" && p.style != "harrier" {
+	if p.style != "artillery" && p.style != "stalker" && p.style != "harrier" && p.style != "leader" {
 		p.style = "harrier"
 	}
 	return p
@@ -495,7 +495,7 @@ func (p *Pilot) move(o *Obs, goal V2, mode string, target *Actor, danger float64
 		if target != nil && mode == "fight" {
 			d := q.Sub(xy(target.Pos)).Len()
 			pref := 100.0
-			if p.style == "stalker" {
+			if p.style == "stalker" || p.style == "leader" {
 				pref = 33
 			}
 			if p.style == "artillery" {
@@ -558,7 +558,7 @@ func (p *Pilot) move(o *Obs, goal V2, mode string, target *Actor, danger float64
 	if (mode == "zone" || mode == "retreat") && wp.Sub(xyMe).Len() > 15 && me.Energy > 30 {
 		boost = true
 	}
-	if mode == "fight" && p.style == "stalker" && target != nil && xy(target.Pos).Sub(xyMe).Len() > 55 && me.Energy > 55 {
+	if mode == "fight" && (p.style == "stalker" || p.style == "leader") && target != nil && xy(target.Pos).Sub(xyMe).Len() > 55 && me.Energy > 64 {
 		boost = true
 	}
 	if mode == "loot" && goal.Sub(xyMe).Len() > 75 && danger < 0.7 && me.Energy > 78 {
