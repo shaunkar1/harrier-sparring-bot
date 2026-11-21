@@ -34,7 +34,7 @@ func (p *Pilot) pickup(o *Obs, a *Action) {
 		if (p.style == "stalker" || p.style == "leader") && item.Kind == "lightning" {
 			value = 145
 		}
-		if item.Kind == "mortar" && (p.has(me, "laser") || p.style == "leader") {
+		if item.Kind == "mortar" && (p.has(me, "laser") || p.style == "leader" || p.style == "firststrike") {
 			continue
 		} // avoid cookoff
 		if item.Kind == "laser" && p.has(me, "mortar") {
@@ -103,6 +103,9 @@ func (p *Pilot) upgrade(o *Obs, a *Action) {
 		return
 	}
 	prio := []string{"plating", "armor", "nanites", "laser_charge", "laser_damage", "gun_rate", "servos", "lightning_range", "lightning_efficiency", "laser_pierce", "gun_damage", "reactor", "jets", "gyros", "sensors", "capacitor", "gun_mag", "mortar_splash", "mortar_reload"}
+	if p.style == "firststrike" {
+		prio = []string{"laser_damage", "laser_charge", "plating", "armor", "nanites", "servos", "gun_damage", "gun_rate", "gyros", "sensors", "jets", "reactor"}
+	}
 	if p.style == "leader" {
 		prio = []string{"laser_damage", "laser_charge", "lightning_efficiency", "lightning_range", "plating", "armor", "nanites", "servos", "reactor", "capacitor", "gun_damage", "gun_rate", "jets", "gyros"}
 	}
@@ -345,6 +348,7 @@ func (p *Pilot) attack(o *Obs, a *Action, enemy *Actor, mode string, lootKind st
 }
 func (p *Pilot) act(o *Obs) Action {
 	if p.style == "leader" { return p.leaderAct(o) }
+	if p.style == "firststrike" { return p.firstStrikeAct(o) }
 	me := &o.Self
 	p.remember(o)
 	a := Action{Tick: o.Tick, Aim: me.Aim}
